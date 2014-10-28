@@ -1,0 +1,149 @@
+# site-specific variable definitions for lalashan WorkingWiki installation
+# see also site/makefile-after
+
+ifeq ($(HOME),)
+export HOME = /home/wwhome
+export CABALDIR = $(HOME)/.cabal
+export CABAL_DIR = $(HOME)/.cabal
+endif
+
+DEFPUSHDIR = /var/www/html/wikis/
+
+CC = gcc
+
+# Push runs the first perl script among its dependencies, using all the other dependencies as arguments
+PUSH = perl -wf $(filter %.pl, $^) $(filter-out %.pl, $^) > $@
+
+# Pushout adds the name of the output file as the first argument (assuming you only have one .pl dependency)
+PUSHOUT = perl -wf $(filter %.pl, $^) $@ $(filter-out %.pl, $^) > $@
+
+# Pushon appends (pushes onto the file that's already there)
+PUSHON = perl -wf $(filter %.pl, $^) $(filter-out %.pl, $^) >> $@
+
+# PITH is the python version of PUSH
+PITH = python $(filter %.py, $^) $(filter-out %.py, $^) > $@
+
+EXEC = ./$(filter %.exe, $^) $(filter-out %.exe, $^) > $@
+
+rmd_html = Rscript -e "library('knitr'); knit2html('$<')"
+rmd_R = 	Rscript -e "library('knitr'); purl('$<')"
+rmd_knit = Rscript -e "library('knitr'); knit('$<')"
+
+### Which one?
+RMAKE = 	$(MAKE) -C $(dir $@) -f $(RESOURCES)/site/wwMakefile $(notdir $@)
+RMAKE = $(MAKE) -f $(RESOURCES)/makefile -C $(dir $@) $(notdir $@)
+## Neither - use $(call ww-make-in-other-project,$(OTHERDIR),target)
+
+TEXINPUTS = .:$(SITE_RESOURCES)/tex:
+export TEXINPUTS
+
+BSTINPUTS = .:$(SITE_RESOURCES)/tex:
+export BSTINPUTS
+
+PAMLBIN = /usr/local/paml/paml43/bin/
+
+LHTML = /var/www/html/
+
+# WW_MKFILES is the list of .mk files that will be included 
+# when we get to site/makefile-after
+# first extract all the .mk files from the list of source files
+WW_ALL_MKFILES = $(filter %.mk,$(WW_THIS_PROJECT_SOURCE_FILES))
+# and now do some trickery to exclude */*.mk
+WW_MKFILES = $(filter $(WW_ALL_MKFILES),$(subst /, ,$(WW_ALL_MKFILES)))
+# allow caller to add some more
+WW_MKFILES += $(WW_EXTRA_MKFILES)
+
+# WW provides in the environment $(WG_SCRIPT_PATH) = e.g. 'theobio/worden'
+# and $(WG_SITENAME) = e.g. 'Worden'.
+# Since WG_SCRIPTPATH on theobio wikis has two parts, the farm name and the
+# wiki name, here we separate it into $(WW_WIKI_FARM) and $(WW_WIKI_NAME).
+WG_SCRIPT_PATH_WORDS = $(subst /, ,$(WG_SCRIPT_PATH))
+WW_WIKI_FARM = $(word 1,$(WG_SCRIPT_PATH_WORDS))
+WW_WIKI_NAME = $(word 2,$(WG_SCRIPT_PATH_WORDS))
+
+######################################################
+
+# R stuff
+
+PDFCHECK = perl -wf $(SITE_RESOURCES)/pdfcheck.pl $@
+RPREP = $(SITE_RESOURCES)/Rprep.pl
+RCOMM = R
+CW = $(SITE_RESOURCES)/cw.pl
+Rtrim = $(SITE_RESOURCES)/Rtrim.pl
+
+define do-R 
+	perl -f $(RPREP) $@ $^ > $(@:.Rout=.RR)
+	- /bin/mv -f $(@:.Rout=.RData) $(@:.Rout=.old.RData)
+	( ($(RCOMM) --vanilla --args $($(@:.Rout=.Rargs)) < $(@:.Rout=.RR) > $(@:.Rout=.dmp)) 2> $(@:.Rout=.Rlog) && cat $(@:.Rout=.Rlog) ) || ! cat $(@:.Rout=.Rlog)
+	perl -wf $(Rtrim) $(@:.Rout=.dmp) > $@
+	# /bin/mv -f Rplots.pdf $(@:.Rout=.Rout.pdf)
+endef
+
+define clean-R 
+	$(RM) $(@:.Rout=.dmp)
+	- $(RM) $(@:.Rout=.old.RData)
+endef
+
+define run-R
+	$(do-R)
+	$(clean-R)
+endef
+
+define run-r
+	$(run-R)
+endef
+define run-codeml
+	/bin/cp -f $(filter %.tre, $^) current.tre
+	/bin/cp -f $(filter %.nuc, $^) current.nuc
+	$(PAMLBIN)/codeml  $(filter %.ctl, $^)> $@.log
+	- /bin/mv -f 2NG.dN $*.dN
+	- /bin/mv -f 2NG.dS $*.dS
+	- /bin/mv -f 2NG.t $*.t
+	- /bin/mv -f 4fold.nuc $*.4fold.nuc
+	- /bin/mv -f NPDNDS $*.NPDNDS
+	- /bin/mv -f current.cml.ctl $*.cml.ctl
+	- /bin/mv -f lnf $*.lnf
+	- /bin/mv -f rst $*.rst
+	- /bin/mv -f rst1 $*.rst1
+	- /bin/mv -f rub $*.rub
+	- /bin/mv -f current.cml $@
+endef
+
+######################################################
+
+# Maxima
+
+# Tell maxima how to find maxima-init.mac
+export MAXIMA_USERDIR=$(SITE_RESOURCES)
+
+###################################################################
+
+# DMU
+
+# see comments at Refs below
+# this might need some testing to see whether variable name with slash in
+# it works.  If not I'll fix the WW code so it transforms the slash. -lw
+# ifeq ($(origin DMU), undefined)
+# ifneq ($(origin PROJECT_DIR_projects_Theobio/dmu), undefined)
+# export DMU := $(PROJECT_DIR_projects_Theobio/dmu)
+# else
+# export DMU := ../../projects/Theobio%2Fdmu
+# endif
+# endif
+
+######################################################
+
+# Refs
+
+# any project that uses Refs's services is supposed to include it as
+# a prerequisite project with its location passed in $(REF).
+# We want to support users who include the project with a different name.
+
+ifeq ($(origin REF), undefined)
+ifneq ($(origin PROJECT_DIR_projects_Refs), undefined)
+REF := $(PROJECT_DIR_projects_Refs)
+else
+REF := $(PROJECT_DIR_Refs)
+endif
+endif
+export REF

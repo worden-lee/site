@@ -1,0 +1,4 @@
+set_plot_option ([plot_format, gnuplot])$
+set_plot_option ([gnuplot_term, ps])$
+set_plot_option ([gnuplot_out_file, "maxima_plot.ps"])$
+

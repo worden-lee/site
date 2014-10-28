@@ -1,0 +1,416 @@
+# site-specific rules for lalashan WorkingWiki installation
+# see also site/makefile-before
+
+######################################################
+
+# .mk files are read after Makefile, but before the site rules
+# WW_MKFILES is defined in site/makefile-before
+$(info Including .mk files: $(WW_MKFILES))
+-include $(WW_MKFILES)
+#-include $(notdir WG_SCRIPT_PATH).mk
+-include $(SITE_RESOURCES)/$(notdir $(WG_SCRIPT_PATH)).mk
+
+#$(info Including $(wildcard *.mk))
+#-include *.mk
+
+######################################################
+
+### Comparison
+
+.PRECIOUS: %.temp
+%.temp: 
+	/bin/cp -f $* $@
+
+%.newcomp: %
+	/bin/cp -f $* $*.temp
+
+%.compare: % %.temp
+	- diff $* $*.temp > $@
+
+### Listings
+
+ls: .
+	ls > $@
+
+%.ls: .
+	ls -$* > $@
+
+%.var: /proc/uptime
+	echo $($*)> $@
+
+######################################################
+
+# Gnuplot
+
+%.gpl.jpg: $(SITE_RESOURCES)/jpg.tmp
+	$(run-gnuplot)
+
+%.gpl.pdf: $(SITE_RESOURCES)/pdf.tmp
+	$(run-gnuplot)
+
+######################################################
+
+# Push
+# We want to get an error if user does not specify PUSHDIR
+# This should be done using DEFPUSHDIR from makefile-before
+
+$(PUSHDIR):
+	mkdir $@
+
+%.push: % $(PUSHDIR)
+	/bin/cp -f $< $(PUSHDIR)
+	chmod a+r $(PUSHDIR)/$<
+
+######################################################
+
+# Easy rules
+
+%.pl.out: %.pl
+	$(PUSH)
+
+%.py.out: %.py
+	$(PITH)
+
+# pushlogo
+
+pushlogo: $(SITE_RESOURCES)/pushlogo.pl
+	$(PUSH)
+
+pushheader: $(SITE_RESOURCES)/pushlogo.pl
+	perl -wf $(filter %.pl, $^) headerImage $(filter-out %.pl, $^) > $@
+
+pushbanner: $(SITE_RESOURCES)/pushlogo.pl
+	perl -wf $(filter %.pl, $^) bannerImage $(filter-out %.pl, $^) > $@
+
+######################################################
+
+
+# pdftk
+# Lots of repetitive commands for both - and . syntax
+include $(SITE_RESOURCES)/pdftk.mk
+
+# R stuff
+
+.PRECIOUS: %.summary.Rout
+%.summary.Rout: %.Rout $(SITE_RESOURCES)/summary.R
+	$(run-R)
+
+.PRECIOUS: %.objects.Rout
+%.objects.Rout: %.Rout $(SITE_RESOURCES)/objects.R
+	$(run-R)
+
+# This one always works before the one below it
+.PRECIOUS: %.Rout
+%.Rout: %.R
+	$(run-R)
+
+# Do we need to suppress this because of how make chains?
+# Not in general, because many projects rely on it.  But we can allow
+# particular projects to suppress it by setting this variable.
+ifndef SUPPRESS_EMPTY_ROUT_RULE
+%.Rout:
+	$(run-R)
+endif
+
+.PRECIOUS: %.Rout.pdf
+%.Rout.pdf: %.Rout 
+	$(PDFCHECK) 
+
+%.manual.pdf: %.Rout 
+	$(PDFCHECK) 
+
+%.Rout.png: %.Rout
+	$(MAKE) $<.pdf
+	/bin/rm -f $@
+	convert $<.pdf[0] $@
+
+# Repetitive commands for various page-specific files
+# Currently JD is confused about how everything is working; there are new rules from LW
+# include $(SITE_RESOURCES)/pages.mk
+
+%.Routput: %.Rout
+	perl -f $(SITE_RESOURCES)/Rcalc.pl $< > $@ 
+
+.PRECIOUS: %.RData
+%.RData: %.Rout ;
+
+######################################################
+# view a pdf file as per-page pngs
+%.all-pngs.wikitext : $(SITE_RESOURCES)/all-pngs.pl %.pdf
+	perl -f $^ > $@
+
+# or as per-page svgs
+%.all-svgs.wikitext : $(SITE_RESOURCES)/all-svgs.pl %.pdf
+	perl -f $^ > $@
+
+%.svg : %.pdf
+	pdf2svg $^ $@
+
+######################################################
+
+# Old R stuff
+
+# These rules still work, but this one needs to be re-enabled in some directories (by copying it to a local make file):
+
+# %.R:
+#	echo "# Empty automatic R file" > $@
+
+
+%.out: % # Cancel bizarre suffix rule
+
+# New figure philosophy.  RR.pl uses pdf.  You can specify png if you want; this will generate a png with no .R in the middle.  .R.png is generated automatically via pdf (usually should not be a problem)
+
+%.R.out: %.R
+	perl -f $(SITE_RESOURCES)/RR.pl $@ $^ > $*.RR
+	R --vanilla < $*.RR > $*.R.dmp
+	perl -wf $(SITE_RESOURCES)/Rtrim.pl $*.R.dmp > $*.R.out
+	$(RM) $*.RR $*.R.dmp
+	- /usr/bin/rename Rplots .$*.R *.pdf
+	- /usr/bin/rename Rplot001 .$* *.png
+
+%.R.calc: %.R.out
+	perl -f $(SITE_RESOURCES)/Rcalc.pl $< > $@ 
+
+%.R.env: %.R.out ;
+%.R.pdf: %.R.out
+	cp -f .$@ $@
+
+%.R.png: %.R.pdf
+	convert $< $@
+
+# %.png: %.R.out
+	# mv .$@ $@
+
+# Move Rout stuff to Rout.mk suddenly
+
+%.ps : %.pdf
+	convert $< $@
+
+######################################################
+
+# Manual 
+
+# Pass dependencies while tricking automatic prep programs (like Rprep)
+
+.PRECIOUS: %.envir
+%.envir: %
+	touch $@
+
+.PRECIOUS: %.manual
+%.manual: %
+	touch $@
+
+%.touch:
+	touch $*
+
+%.destroy:
+	/bin/rm -f $*
+
+%.ddestroy:
+	/bin/rm -rf $*
+
+destroy_all_extensions:
+	/bin/rm -f *.*
+
+destroy_extension_%:
+	/bin/rm -f *.$*
+
+destroy_ww_dir:
+	/bin/rm -rf .workingwiki/
+
+######################################################
+
+# Maxima
+.PRECIOUS: %.mac.out
+%.mac.out: %.mac
+	$(SITE_RESOURCES)/mx.pl $@ $^ > $*.mx
+	maxima -b $*.mx | $(SITE_RESOURCES)/mxtrim.pl > $@
+	- /usr/bin/rename maxima_plot .$*.mac *.ps
+
+.PRECIOUS: %.mxv
+%.mxv: %.mac.out ;
+
+%.mac.ps: %.mac.out
+	mv .$@ $@
+
+# ps seems to be prettier than png
+# %.png: %.mac.out ;
+
+%.mac:
+	echo "/* Automatic empty maxima file */" > $@
+
+###################################################################
+
+# DMU
+
+.PRECIOUS: %.tab.tex
+%.tab.tex: %.tsv %.tmp
+	perl -wf $(DMU)/dmu.pl $^ $(DMU)/tab.fmt > $@
+
+# A rule to trick the .d dependencies!
+# If we ask for *.tab, it makes *.tex (not *.tab.tex) as a side effect
+
+%.tab: %.tsv %.tmp
+	perl -wf $(DMU)/dmu.pl $^ $(DMU)/tab.fmt > $@
+	/bin/cp -f $@ $*.tex
+
+# .fmt and .tmp files are local!  Eventually, put them in a permanent location.
+# Eventually add locations of permanent .fmt and .tmp files? What about supplementary .fmt file?
+%.tex: %.let letter.fmt letter.tmp
+	perl -wf $(DMU)/dmu.pl $^ > $@
+
+%.article.tex: %.tex artcom.tex
+	echo "\documentclass[12pt]{article}\input{artcom.tex}\begin{document}" > $@
+	cat $< >> $@
+	echo "\end{document}" >> $@
+
+artcom.tex:
+	touch $@
+
+suppfig.tex:
+	/bin/cp $(SITE_RESOURCES)/tex/$@ .
+
+## csv to wikitext -- when will I do things through dmu, if ever?
+
+%.wikitext: %.csv $(CW)
+	$(PUSH)
+
+######################################################
+
+# Refs
+
+%.rmu: %.rr $(REF)/rr.pl
+	$(PUSH)
+
+%.bib: %.rmu $(REF)/newpm.pl
+	echo Running $(REF)/newpm.pl for $@ with $(SITE_RESOURCES)
+	$(PUSH)
+
+%.yearonly.bib: %.bib $(REF)/yearonly.pl
+	$(PUSH)
+
+# %.rmu dependency is so that this rule is not invoked by other attempts to make wikitext
+%.wikitext: %.rmu %.bib ;
+
+%.raw.bib: %.rmu $(REF)/rawbib.pl
+	$(PUSH)
+
+%.comp.bib: %.bib %.raw.bib
+	cat $^ > $@
+
+######################################################
+
+# knitr and R markdown
+
+ifndef SWEAVE_COMPATIBILITY
+%.tex: %.Rnw
+	Rscript -e "library('knitr'); knit('$<')"
+else
+$(info USING SWEAVE COMPATIBILITY)
+%.tex : %.Rnw
+	Rscript -e "Sweave('$<')"
+endif
+
+%.md: %.rmd
+	$(rmd_knit)
+
+%.html: %.rmd
+	$(rmd_html)
+
+%.R: %.rmd
+	$(rmd_R)
+
+######################################################
+
+# Stuff for commutative diagrams added by LW
+
+# %.cd is a commutative diagram written in LaTeX/tikz-cd format
+# Here we wrap it up into a full .tex document
+%.cd.tex : %.cd
+	(echo "\documentclass{article}"; \
+	 echo "\RequirePackage{tikz-cd}"; \
+	 echo "\pagestyle{empty}"; \
+	 echo "\begin{document}"; \
+	 cat $<; \
+	 echo "\end{document}") > $@
+
+# The wiki has make rules to make .pdf from .tex.  Once that's done, this rule makes that .pdf into
+# a .svg for displaying in the page, by trimming off the extra white space and 
+# converting the format.
+%.cd.svg : %.cd.crop.pdf
+	pdf2svg $< $@
+
+# trim the blank expanses from the page
+%.crop.pdf : %.pdf
+	pdfcrop --margins 10 $< $@
+
+######################################################
+
+# itex processing for nLab experimentation
+
+%.itex-math.html : %.itex-math
+	/usr/local/src/itex2MML/itex-src/itex2MML < $< > $@
+
+######################################################
+
+# Gimmicks
+
+# Markup html
+
+%.proj.html: $(SITE_RESOURCES)/proj_html.pl
+	$(PUSHOUT)
+
+%.src.html: % $(SITE_RESOURCES)/src_html.pl
+	$(PUSHOUT)
+
+# bc
+
+%.bc.out: %.bc
+	bc -l $< > $@
+
+# Word counts
+
+%.wc: %
+	wc $< > $@
+
+%.pdf.count: %.pdf
+	pdftotext $< -enc UTF-8 - | wc > $@
+
+%.tex.count: %.tex
+	texcount $< > $@
+
+# Errors only when make fails
+
+%.errors: %.make.log 
+	perl -f $(SITE_RESOURCES)/errors.pl $< > $@ 
+
+%.Rerrors: %.make.log
+	$(MAKE) $*.errors
+	cat /dev/null > $@
+	- cat $*.dmp > $@
+	cat $*.errors >> $@
+
+
+######################################################
+
+## Check up on make
+
+%.report: /proc/uptime
+	echo $* is up to date > $@
+	$(MAKE) -q $* || $(MAKE) -n $* > $@ || echo Don\'t know how to make $*, even with slow rules > $@
+
+%.trace: /proc/uptime
+	echo $* is up to date > $@
+	$(MAKE) -q $* || $(MAKE) -nd $* > $@ || echo Don\'t know how to make $*, even with slow rules > $@
+
+%.bgcheck: /proc/uptime
+	echo Nothing to do for $* > $@
+	$(MAKE) -q FOREGROUND_ONLY= $* || echo WARNING: $* is not up to date with respect to slow rules > $@
+
+%.bgreport: /proc/uptime
+	echo $* is up to date > $@
+	$(MAKE) -q FOREGROUND_ONLY= $* || $(MAKE) -n FOREGROUND_ONLY= $* > $@ || echo Don\'t know how to make $*, even with slow rules > $@
+
+%.bgtrace: /proc/uptime
+	echo $* is up to date > $@
+	$(MAKE) -q FOREGROUND_ONLY= $* || $(MAKE) -n FOREGROUND_ONLY= $* > $@ || echo Don\'t know how to make $*, even with slow rules > $@

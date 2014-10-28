@@ -1,0 +1,10 @@
+export time-limit=180
+export PUBLIC_DIR_URL=/theobio/projects/index.php/Special:GetProjectFile?make=false\&amp\;display=download\&amp\;project=Theobio%2FR_rules\&amp\;filename=
+export chroot-directory=/
+export MAKE=/usr/bin/make
+export report-hostname=1
+export FOREGROUND_ONLY=1
+include $(RESOURCES)/makefile-before
+-include Makefile
+-include *.mk
+include $(RESOURCES)/makefile-after

@@ -1,0 +1,38 @@
+% Margin-setting commands by J. Dushoff
+
+\newlength{\rloff}
+\setlength{\rloff}{0em}
+
+\newcommand{\tbmargin}[1]{%
+	\setlength{\textheight}{9.0in}%
+	\advance\textheight by -#1%
+	\advance\textheight by -#1%
+	\setlength{\headheight}{0.0in}\setlength{\headsep}{0.0in}%
+	\setlength{\topmargin}{#1}%
+}
+\newcommand{\rlmargin}[1]{%
+	\setlength{\textwidth}{6.5in}
+	\advance\textwidth by -#1%
+	\advance\textwidth by -#1%
+	\setlength{\leftmargin}{0.0in}%
+	\setlength{\rightmargin}{0.0in}%
+	\setlength{\oddsidemargin}{0.0in}%
+	\setlength{\evensidemargin}{0.0in}%
+	\advance\hoffset by -\rloff
+	\advance\hoffset by #1%
+	\setlength{\rloff}{#1}%
+}
+\tbmargin{0in}
+\rlmargin{0in}
+\rlmargin{0.5in}
+
+\newenvironment{changemargin}[1]{%
+	\begin{list}{}{%
+		\setlength{\topsep}{0pt}%
+		\setlength{\leftmargin}{#1}%
+		\setlength{\rightmargin}{#1}%
+		\setlength{\listparindent}{\parindent}%
+		\setlength{\itemindent}{\parindent}%
+		\setlength{\parsep}{\parskip}%
+	}%
+\item[]}{\end{list}}

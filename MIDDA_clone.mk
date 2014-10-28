@@ -1,0 +1,2 @@
+test.opera:
+	echo La > $@

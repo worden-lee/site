@@ -1,0 +1,6 @@
+
+site-lalashan and site-yushan are historical names: where were these directories when we decided to merge them.  site-lalashan is really site-new, and site-yushan is really a temporary archive.
+
+Once we don't need anything from site-yushan, we should get rid of it and update the naming structure.  If the old lalashan is still around, we will need to also find the link from there to here, and update it.
+
+UPDATE: done. site-yushan is gone, and site-lalashan has been renamed to site.  We aren't using the old lalashan, so I didn't update anything there.  LW
