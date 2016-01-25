@@ -1,3 +1,6 @@
+# site-specific additions for lee's laptop
+#HTML5_FORMAT=html
+
 # site-specific variable definitions for lalashan WorkingWiki installation
 # see also site/makefile-after
 

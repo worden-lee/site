@@ -322,17 +322,29 @@ endif
 
 ######################################################
 
+# Stuff for .step files added by LW
+
+-include $(SITE_RESOURCES)/step.mk
+
+# and for running sage
+
+-include $(SITE_RESOURCES)/sage.mk
+
+######################################################
+
 # Stuff for commutative diagrams added by LW
 
 # %.cd is a commutative diagram written in LaTeX/tikz-cd format
 # Here we wrap it up into a full .tex document
 %.cd.tex : %.cd
-	(echo "\documentclass{article}"; \
-	 echo "\RequirePackage{tikz-cd}"; \
-	 echo "\pagestyle{empty}"; \
-	 echo "\begin{document}"; \
+	(echo '\\documentclass{article}'; \
+	 echo '\\usepackage{tikz-cd}'; \
+	 echo '\\usetikzlibrary{decorations.pathmorphing}'; \
+	 echo '\\usepackage{amsmath,amsfonts}'; \
+	 echo '\\pagestyle{empty}'; \
+	 echo '\\begin{document}'; \
 	 cat $<; \
-	 echo "\end{document}") > $@
+	 echo '\\end{document}') > $@
 
 # The wiki has make rules to make .pdf from .tex.  Once that's done, this rule makes that .pdf into
 # a .svg for displaying in the page, by trimming off the extra white space and 
